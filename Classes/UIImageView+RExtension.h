@@ -9,5 +9,6 @@
 #import <UIKit/UIKit.h>
 
 @interface UIImageView (RExtension)
-- (void)setGifImage:(NSString*)gifImageName;
+- (void)setGifImage:(NSURL*)imageURL;
+- (void)setImageData:(NSData*)imageData;
 @end

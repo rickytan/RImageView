@@ -11,19 +11,13 @@
 
 @implementation UIImageView (RExtension)
 
-- (void)setGifImage:(NSString *)gifImageName
+- (void)setImageData:(NSData *)imageData
 {
     CGImageSourceRef source = nil;
     
-    NSData *data = [NSData dataWithContentsOfFile:gifImageName];
-    if (!data) {
-        NSString *path = [[NSBundle mainBundle] pathForResource:gifImageName
-                                                         ofType:nil];
-        data = [NSData dataWithContentsOfFile:path];
-    }
+    NSData *data = imageData;
     
     if (!data) {
-        NSLog(@"Can't load file: %@",gifImageName);
         return;
     }
     
@@ -31,18 +25,18 @@
                                                         forKey:(id)kCGImageSourceTypeIdentifierHint];
     source = CGImageSourceCreateWithData((CFDataRef)data, (CFDictionaryRef)options);
     if (!source) {
-        NSLog(@"Can't open GIF file: %@",gifImageName);
+        
         return;
     }
     
     if (CGImageSourceGetStatus(source) != kCGImageStatusComplete) {
-        NSLog(@"File format not supportted: %@",gifImageName);
+        NSLog(@"File format not supportted");
         return;
     }
     
     CFIndex count = CGImageSourceGetCount(source);
     if (count == 0) {
-        NSLog(@"No frames in file: %@",gifImageName);
+        NSLog(@"No frames");
         return;
     }
     
@@ -55,19 +49,35 @@
             NSLog(@"Frame %lu load failed!",i);
         }
     }
-    self.animationImages = [NSArray arrayWithArray:images];
+    if (count == 1)
+        self.image = images.lastObject;
+    else {
+        self.animationImages = [NSArray arrayWithArray:images];
+        
+        NSDictionary *properties = (NSDictionary*)CGImageSourceCopyProperties(source, NULL);
+        properties = [properties objectForKey:(id)kCGImagePropertyGIFDictionary];
+        
+        NSTimeInterval delay = [[properties objectForKey:(id)kCGImagePropertyGIFDelayTime] floatValue];
+        delay = MAX(delay, 0.1);
+        CGFloat loopCount = [[properties objectForKey:(id)kCGImagePropertyGIFLoopCount] floatValue];
+        
+        CFRelease(properties);
+        
+        self.animationRepeatCount = loopCount;
+        self.animationDuration = delay * count;
+        
+        [self startAnimating];
+    }
+}
+
+- (void)setGifImage:(NSURL*)imageURL
+{
+    [NSURLConnection sendAsynchronousRequest:[NSURLRequest requestWithURL:imageURL]
+                                       queue:[NSOperationQueue currentQueue]
+                           completionHandler:^(NSURLResponse *r, NSData *d, NSError *e) {
+                               [self setImageData:d];
+                           }];
     
-    NSDictionary *properties = (NSDictionary*)CGImageSourceCopyProperties(source, NULL);
-    properties = [properties objectForKey:(id)kCGImagePropertyGIFDictionary];
-    
-    NSTimeInterval delay = [[properties objectForKey:(id)kCGImagePropertyGIFDelayTime] floatValue];
-    delay = MAX(delay, 0.1);
-    CGFloat loopCount = [[properties objectForKey:(id)kCGImagePropertyGIFLoopCount] floatValue];
-    
-    self.animationRepeatCount = loopCount;
-    self.animationDuration = delay * count;
-    
-    [self startAnimating];
 }
 
 @end
